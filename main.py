@@ -25,11 +25,34 @@ def validate(text: str) -> None:
         raise ValueError("entry must be a single line")
 
 
+def validate_entry(path: str, expected: str) -> None:
+    """Guard: re-read the file back from disk and re-validate the exact
+    bytes written, so a silent write failure can never pass quietly.
+
+    Checks the raw bytes decode as valid UTF-8, contain exactly the
+    expected single line (no trailing newline or extra bytes), and pass
+    the same competition gate as the in-memory entry.
+    """
+    with open(path, "rb") as f:
+        raw = f.read()
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"{path} is not valid UTF-8: {exc}") from exc
+    if text != expected:
+        raise ValueError(
+            f"{path} on disk does not match the entry: "
+            f"got {text!r}, expected {expected!r}"
+        )
+    validate(text)
+
+
 def main() -> None:
     validate(ENTRY)
     os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
         f.write(ENTRY)
+    validate_entry(OUTPUT_PATH, ENTRY)
     print(f"wrote {len(ENTRY)} chars to {OUTPUT_PATH}: {ENTRY}")
 
 
